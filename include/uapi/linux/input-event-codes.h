@@ -800,6 +800,9 @@
 #define SW_HPHR_OVERCURRENT	0x12  /* set = over current on right hph */
 #define SW_MICROPHONE2_INSERT	0x13  /* set = inserted */
 #define SW_UNSUPPORT_INSERT	0x14  /* set = unsupported device inserted */
+#ifdef CONFIG_TOUCHSCREEN_SEC_TS
+#define SW_GLOVE		0x20  /* set = glove mode */
+#endif
 #define SW_MAX			0x20
 #define SW_CNT			(SW_MAX+1)
 
