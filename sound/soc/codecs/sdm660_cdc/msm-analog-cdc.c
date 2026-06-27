@@ -33,6 +33,10 @@
 #include "msm-cdc-common.h"
 #include "../../msm/sdm660-common.h"
 #include "../wcd-mbhc-v2.h"
+#ifdef CONFIG_MACH_GM_GM9PRO_SPROUT
+#include <linux/of_gpio.h>
+#include <linux/mfd/msm-cdc-pinctrl.h>
+#endif /* CONFIG_MACH_GM_GM9PRO_SPROUT */
 
 #define DRV_NAME "pmic_analog_codec"
 #define SDM660_CDC_RATES (SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000 |\
@@ -1866,6 +1870,40 @@ static int msm_anlg_cdc_spk_boost_set(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+#if defined(CONFIG_MACH_GM_GM9PRO_SPROUT)
+static int msm_anlg_cdc_rcv_analog_switch_get(struct snd_kcontrol *kcontrol,
+				struct snd_ctl_elem_value *ucontrol)
+{
+	return 0;
+}
+
+static int msm_anlg_cdc_rcv_analog_switch_set(struct snd_kcontrol *kcontrol,
+					  struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
+	struct sdm660_cdc_priv *sdm660_cdc =
+					snd_soc_codec_get_drvdata(codec);
+
+	dev_dbg(codec->dev, "%s: ucontrol->value.integer.value[0] = %ld\n",
+		__func__, ucontrol->value.integer.value[0]);
+
+	switch (ucontrol->value.integer.value[0]) {
+	case 1:
+		if (gpio_is_valid(sdm660_cdc->rcv_switch))
+			gpio_direction_output(sdm660_cdc->rcv_switch, 1);
+		break;
+	case 0:
+	default:
+		if (gpio_is_valid(sdm660_cdc->rcv_switch))
+			gpio_direction_output(sdm660_cdc->rcv_switch, 0);
+		break;
+	}
+	dev_dbg(codec->dev, "%s: sdm660_cdc->rcv_analog_switch_set = %d\n",
+		__func__, ucontrol->value.integer.value[0]);
+	return 0;
+}
+#endif
+
 static int msm_anlg_cdc_ext_spk_boost_get(struct snd_kcontrol *kcontrol,
 					  struct snd_ctl_elem_value *ucontrol)
 {
@@ -1939,6 +1977,14 @@ static const struct soc_enum msm_anlg_cdc_spk_boost_ctl_enum[] = {
 		SOC_ENUM_SINGLE_EXT(2, msm_anlg_cdc_spk_boost_ctrl_text),
 };
 
+#if defined(CONFIG_MACH_GM_GM9PRO_SPROUT)
+static const char * const msm_anlg_cdc_rcv_analog_switch_ctrl_text[] = {
+		"OFF", "ON"};
+static const struct soc_enum msm_anlg_cdc_rcv_analog_switch_ctl_enum[] = {
+		SOC_ENUM_SINGLE_EXT(2, msm_anlg_cdc_rcv_analog_switch_ctrl_text),
+};
+#endif
+
 static const char * const msm_anlg_cdc_ext_spk_boost_ctrl_text[] = {
 		"DISABLE", "ENABLE"};
 static const struct soc_enum msm_anlg_cdc_ext_spk_boost_ctl_enum[] = {
@@ -1974,6 +2020,11 @@ static const struct snd_kcontrol_new msm_anlg_cdc_snd_controls[] = {
 
 	SOC_ENUM_EXT("Speaker Boost", msm_anlg_cdc_spk_boost_ctl_enum[0],
 		msm_anlg_cdc_spk_boost_get, msm_anlg_cdc_spk_boost_set),
+
+#if defined(CONFIG_MACH_GM_GM9PRO_SPROUT)
+	SOC_ENUM_EXT("RCV ANALOG SWITCH", msm_anlg_cdc_rcv_analog_switch_ctl_enum[0],
+		msm_anlg_cdc_rcv_analog_switch_get, msm_anlg_cdc_rcv_analog_switch_set),
+#endif
 
 	SOC_ENUM_EXT("Ext Spk Boost", msm_anlg_cdc_ext_spk_boost_ctl_enum[0],
 		msm_anlg_cdc_ext_spk_boost_get, msm_anlg_cdc_ext_spk_boost_set),
@@ -4098,6 +4149,83 @@ int msm_anlg_codec_info_create_codec_entry(struct snd_info_entry *codec_root,
 }
 EXPORT_SYMBOL(msm_anlg_codec_info_create_codec_entry);
 
+#ifdef CONFIG_SND_SOC_DBMDX
+struct snd_soc_codec *platform_codec;
+int enable_mic_bias(bool enable) {
+
+	int ret = 0;
+	struct snd_soc_codec *codec = platform_codec;
+	struct sdm660_cdc_priv *sdm660_cdc =
+					snd_soc_codec_get_drvdata(codec);
+	struct on_demand_supply *supply;
+
+	supply = &sdm660_cdc->on_demand_list[0];
+
+	if (!supply->supply) {
+		dev_err(codec->dev, "%s: err mic_bias supply not present \n",
+			__func__);
+		return ret;
+	}
+
+	if (enable) {
+		if (atomic_inc_return(&supply->ref) == 1) {
+			ret = regulator_set_voltage(supply->supply,
+						    supply->min_uv,
+						    supply->max_uv);
+			if (ret) {
+				dev_err(codec->dev,
+					"Setting regulator voltage(en) for micbias with err = %d\n",
+					ret);
+				return -EPERM;
+			}
+			ret = regulator_set_load(supply->supply,
+						 supply->optimum_ua);
+			if (ret < 0) {
+				dev_err(codec->dev,
+					"Setting regulator optimum mode(en) failed for micbias with err = %d\n",
+					ret);
+				return -EPERM;
+			}
+			ret = regulator_enable(supply->supply);
+		}
+		if (ret)
+			dev_err(codec->dev, "%s: Failed to enable mic bias1\n", __func__);
+
+		snd_soc_update_bits(platform_codec, MSM89XX_PMIC_ANALOG_MICB_1_EN, 0x80, 0x80);
+
+
+	} else {
+		if (atomic_read(&supply->ref) == 0) {
+			dev_dbg(codec->dev, "%s: mic bias1 supply has been disabled.\n", __func__);
+			return -EPERM;
+		}
+		if (atomic_dec_return(&supply->ref) == 0) {
+			ret = regulator_disable(supply->supply);
+			if (ret)
+				dev_err(codec->dev, "%s: Failed to disable mic bias1\n", __func__);
+			ret = regulator_set_voltage(supply->supply,
+						    0,
+						    supply->max_uv);
+			if (ret) {
+				dev_err(codec->dev,
+					"Setting regulator voltage(dis) failed for micbias with err = %d\n",
+					ret);
+				return -EPERM;
+			}
+			ret = regulator_set_load(supply->supply, 0);
+			if (ret < 0)
+				dev_err(codec->dev,
+					"Setting regulator optimum mode(dis) failed for micbias with err = %d\n",
+					ret);
+		}
+
+		snd_soc_update_bits(platform_codec, MSM89XX_PMIC_ANALOG_MICB_1_EN, 0x80, 0x00);
+	}
+
+	return 0;
+}
+#endif
+
 static int msm_anlg_cdc_soc_probe(struct snd_soc_codec *codec)
 {
 	struct sdm660_cdc_priv *sdm660_cdc;
@@ -4213,6 +4341,10 @@ static int msm_anlg_cdc_soc_probe(struct snd_soc_codec *codec)
 	snd_soc_dapm_ignore_suspend(dapm, "PDM Capture");
 
 	snd_soc_dapm_sync(dapm);
+
+#ifdef CONFIG_SND_SOC_DBMDX
+	platform_codec = codec;
+#endif
 
 	return 0;
 }
@@ -4642,6 +4774,22 @@ static int msm_anlg_cdc_probe(struct platform_device *pdev)
 			__func__, ret);
 		goto err_supplies;
 	}
+
+#if defined(CONFIG_MACH_GM_GM9PRO_SPROUT)
+	sdm660_cdc->rcv_switch = of_get_named_gpio(pdev->dev.of_node,
+			"qcom,wsa-switch-enable-gpio", 0);
+	if (sdm660_cdc->rcv_switch < 0) {
+		dev_err(&pdev->dev,
+			"property %s in node %s not found %d\n",
+			"qcom,wsa-switch-enable-gpio", pdev->dev.of_node->full_name,
+			sdm660_cdc->rcv_switch);
+	}
+	if (gpio_is_valid(sdm660_cdc->rcv_switch)) {
+		gpio_request(sdm660_cdc->rcv_switch, "rcv_switch");
+		gpio_direction_output(sdm660_cdc->rcv_switch, 0);
+	}
+#endif
+
 	BLOCKING_INIT_NOTIFIER_HEAD(&sdm660_cdc->notifier);
 	BLOCKING_INIT_NOTIFIER_HEAD(&sdm660_cdc->notifier_mbhc);
 
