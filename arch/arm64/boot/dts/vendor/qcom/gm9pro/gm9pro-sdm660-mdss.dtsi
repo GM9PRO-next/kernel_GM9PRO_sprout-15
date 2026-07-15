@@ -2,4 +2,10 @@
 
 &mdss_dsi0 {
 	vdda-3p3-supply = <&pm660l_l3>;
+	qcom,dsi-pref-prim-pan = <&dsi_ams601nn13_amoled_fhd_cmd>;
+	pinctrl-names = "mdss_default", "mdss_sleep";
+	pinctrl-0 = <&mdss_dsi_active &mdss_te_active>;
+	pinctrl-1 = <&mdss_dsi_suspend &mdss_te_suspend>;
+	qcom,platform-reset-gpio = <&tlmm 53 0>;
+	qcom,platform-te-gpio = <&tlmm 59 0>;
 };

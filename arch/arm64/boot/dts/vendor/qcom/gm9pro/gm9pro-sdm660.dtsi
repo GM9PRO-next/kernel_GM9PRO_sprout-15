@@ -28,3 +28,35 @@
 		/delete-node/ camera_snapshot;
 	};
 };
+
+/ {
+	chosen {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+
+	};
+	reserved-memory {
+		cont_splash_mem: splash_region@9d400000 {
+			no-map;
+			reg = <0x0 0x9d400000 0x0 0x2400000>;
+			label = "cont_splash_mem";
+		};
+
+		ramoops_region: ramoops_region@a0000000 {
+			compatible = "removed-dma-pool";
+			no-map;
+			reg = <0x0 0xa0000000 0x0 0x400000>;
+		};
+	};
+
+	ramoops {
+		compatible = "ramoops";
+		memory-region = <&ramoops_region>;
+		console-size = <0x0 0x200000>;
+		pmsg-size = <0x0 0x200000>;
+	};
+};
+
+&mdss_mdp { status = "ok"; };
