@@ -1,6 +1,5 @@
 #include "gm9pro-sdm660-mtp.dtsi"
 #include "gm9pro-pm660.dtsi"
-#include "gm9pro-pm660l.dtsi"
 #include "gm9pro-camera-sensor-mtp.dtsi"
 #include "gm9pro-sec_ts-i2c.dtsi"
 
@@ -20,14 +19,6 @@
 };
 
 &glink_spi_xprt_wdsp {
-	status = "disabled";
-};
-
-&glink_fifo_wdsp {
-	status = "disabled";
-};
-
-&glink_qos_wdsp {
 	status = "disabled";
 };
 
