@@ -1,3 +1,4 @@
+/*
 &cdc_pdm_gpios {
 	status = "disabled";
 };
@@ -21,3 +22,4 @@
 &wsa_spkr_en2 {
 	status = "disabled";
 };
+*/
