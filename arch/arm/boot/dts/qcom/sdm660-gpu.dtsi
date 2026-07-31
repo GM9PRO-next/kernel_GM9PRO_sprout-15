@@ -130,6 +130,9 @@
 		qcom,gpu-quirk-dp2clockgating-disable;
 		qcom,gpu-quirk-lmloadkill-disable;
 
+		/* Enable mid-frame governor updates */
+		qcom,enable-midframe-timer;
+
 		/* Enable context aware freq. scaling */
 		qcom,enable-ca-jump;
 
