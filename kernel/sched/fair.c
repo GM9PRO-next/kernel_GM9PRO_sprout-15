@@ -37,6 +37,8 @@
 #include "tune.h"
 #include "walt.h"
 
+unsigned int __read_mostly sysctl_sched_energy_aware = 1;
+
 /*
  * Targeted preemption latency for CPU-bound tasks:
  * (default: 6ms * (1 + ilog(ncpus)), units: nanoseconds)

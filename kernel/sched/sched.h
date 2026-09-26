@@ -2495,9 +2495,17 @@ static inline unsigned long cpu_util_freq(int cpu)
  */
 #define energy_aware() false
 #else
+extern unsigned int sysctl_sched_energy_aware;
+extern bool sched_energy_aware;
+
 static inline bool energy_aware(void)
 {
-	return sched_feat(ENERGY_AWARE);
+return sysctl_sched_energy_aware && sched_energy_aware;
+}
+
+static inline bool sched_is_energy_aware(void)
+{
+return energy_aware();
 }
 #endif
 
