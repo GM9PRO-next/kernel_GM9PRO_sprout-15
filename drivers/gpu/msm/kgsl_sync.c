@@ -385,6 +385,15 @@ struct kgsl_sync_fence_waiter *kgsl_sync_fence_async_wait(int fd,
 	if (fence == NULL)
 		return ERR_PTR(-EINVAL);
 
+	/* Legacy sync: zero is signaled, positive is active, negative is error.
+	 * Keep the ref and existing async path when the fence is still active.
+	 */
+	status = atomic_read(&fence->status);
+	if (status <= 0) {
+		sync_fence_put(fence);
+		return status < 0 ? ERR_PTR(status) : NULL;
+	}
+
 	/* create the waiter */
 	kwaiter = kzalloc(sizeof(*kwaiter), GFP_ATOMIC);
 	if (kwaiter == NULL) {
