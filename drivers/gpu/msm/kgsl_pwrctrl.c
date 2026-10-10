@@ -2131,6 +2131,7 @@ static inline void _close_clks(struct kgsl_device *device)
 int kgsl_pwrctrl_init(struct kgsl_device *device)
 {
 	int i, k, m, n = 0, result, freq;
+	u32 default_min_freq;
 	struct platform_device *pdev = device->pdev;
 	struct kgsl_pwrctrl *pwr = &device->pwrctrl;
 	struct device_node *ocmem_bus_node;
@@ -2182,6 +2183,21 @@ int kgsl_pwrctrl_init(struct kgsl_device *device)
 			freq = clk_round_rate(pwr->grp_clks[0], freq);
 
 		pwr->pwrlevels[i].gpu_freq = freq;
+	}
+
+	/* Descending power levels: choose the slowest OPP meeting the board floor.
+	 * This sets a default, not a hard floor; thermal max constraints still win.
+	 */
+	if (!of_property_read_u32(pdev->dev.of_node,
+			"qcom,default-min-gpu-freq", &default_min_freq)) {
+		for (i = pwr->num_pwrlevels - 2; i >= 0; i--) {
+			if (pwr->pwrlevels[i].gpu_freq >= default_min_freq) {
+				pwr->min_pwrlevel = i;
+				pwr->default_pwrlevel = min_t(unsigned int,
+					pwr->default_pwrlevel, i);
+				break;
+			}
+		}
 	}
 
 	kgsl_pwrctrl_clk_set_rate(pwr->grp_clks[0],
